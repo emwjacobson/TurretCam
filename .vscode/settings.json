@@ -2,6 +2,11 @@
     "files.associations": {
         "freertos.h": "c",
         "task.h": "c",
-        "esp_system.h": "c"
+        "esp_system.h": "c",
+        "mqtt_client.h": "c",
+        "sdkconfig.h": "c",
+        "stddef.h": "c",
+        "esp_err.h": "c",
+        "*.inc": "c"
     }
 }

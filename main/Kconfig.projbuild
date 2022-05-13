@@ -1,0 +1,33 @@
+menu "System Settings"
+
+    config WIFI_SSID
+        string "WiFi SSID"
+        default "Your_SSID_Here"
+        help
+            SSID of the access point to connect to
+
+    config WIFI_PASSWORD
+        string "WiFi Password"
+        default "Your_Password_Here"
+        help
+            Password of the access point
+
+    config BROKER_URL
+        string "Broker URL"
+        default "mqtt://mqtt.eclipseprojects.io"
+        help
+            URL of the broker to connect to
+
+    config BROKER_USER
+        string "Broker Username"
+        default "User123"
+        help
+            The username used to connect to MQTT broker
+    
+    config BROKER_PASSWORD
+        string "Broker Password"
+        default "Password123"
+        help
+            The password used to connect to MQTT broker
+
+endmenu

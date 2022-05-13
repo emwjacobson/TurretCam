@@ -3,8 +3,7 @@
         {
             "name": "Linux",
             "includePath": [
-                "${default}",
-                "${IDF_PATH}/components"
+                "${default}"
             ],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "gnu17",

@@ -1,30 +1,113 @@
 #include <stdio.h>
+#include <stddef.h>
+#include "sdkconfig.h"
+#include "esp_system.h"
+#include "esp_err.h"
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_system.h"
-#include "esp_spi_flash.h"
 
+#include "mqtt_client.h"
+#include "esp_wifi.h"
 
-void app_main()
-{
-    printf("Hello world!\n");
+// Setup configs
+// These should /technically/ be set using `make menuconfig`
+#ifndef CONFIG_WIFI_SSID
+#define CONFIG_WIFI_SSID "Your_SSID_Here" 
+#endif
 
-    /* Print chip information */
-    esp_chip_info_t chip_info;
-    esp_chip_info(&chip_info);
-    printf("This is ESP8266 chip with %d CPU cores, WiFi, ",
-            chip_info.cores);
+#ifndef CONFIG_WIFI_PASSWORD
+#define CONFIG_WIFI_PASSWORD "Your_Password_Here" 
+#endif
 
-    printf("silicon revision %d, ", chip_info.revision);
+#ifndef CONFIG_BROKER_URL
+#define CONFIG_BROKER_URL "mqtt://mqtt.eclipseprojects.io" 
+#endif
 
-    printf("%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
-            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+#ifndef CONFIG_BROKER_USER
+#define CONFIG_BROKER_USER "User123" 
+#endif
 
-    for (int i = 10; i >= 0; i--) {
-        printf("Restarting in %d seconds...\n", i);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+#ifndef CONFIG_BROKER_PASSWORD
+#define CONFIG_BROKER_PASSWORD "Password123" 
+#endif
+
+static const char* TAG = "Main";
+
+void mqtt_event_handler() {
+    // TODO
+}
+
+esp_err_t init_mqtt() {
+    esp_mqtt_client_config_t mqtt_cfg = {
+        .uri = CONFIG_BROKER_URL,
+        .username = CONFIG_BROKER_USER,
+        .password = CONFIG_BROKER_PASSWORD,
+        .event_handle = mqtt_event_handler
+    };
+
+    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    return esp_mqtt_client_start(client);
+}
+
+esp_err_t init_wifi() {
+    esp_err_t err;
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+
+    err = esp_wifi_init(&cfg);
+    if (err != ESP_OK) {
+        return err;
     }
-    printf("Restarting now.\n");
-    fflush(stdout);
-    esp_restart();
+    ESP_LOGI(TAG, "Wifi Initialized");
+
+    wifi_config_t cfg = {
+        .sta = {
+            .ssid = CONFIG_WIFI_SSID,
+            .password = CONFIG_WIFI_PASSWORD,
+            .threshold = {
+                .authmode = WIFI_AUTH_WPA2_PSK
+            }
+        }
+    };
+
+    err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+        return err;
+    }
+    ESP_LOGI(TAG, "WiFi mode set to station");
+
+    err = esp_wifi_set_config(ESP_IF_WIFI_STA, &cfg);
+    if (err != ESP_OK) {
+        return err;
+    }
+    ESP_LOGI(TAG, "WiFi config set");
+
+    err = esp_wifi_start();
+    if (err != ESP_OK) {
+        return err;
+    }
+    ESP_LOGI(TAG, "WiFi started");
+
+    return ESP_OK;
+}
+
+void init() {
+    esp_err_t err;
+    err = init_wifi();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize wifi. Error: %s", esp_err_to_name(err));
+    }
+
+    // Initialize MQTT
+    err = init_mqtt();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize MQTT client. Error: %s", esp_err_to_name(err));
+        exit(1);
+    }
+}
+
+void app_main() {
+    init();
+
 }
