@@ -71,9 +71,16 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            if (strncmp(event->topic, "turretcam/speed", event->topic_len < sizeof("turretcam/speed") ? event->topic_len : sizeof("turretcam/speed"))) {
-                printf("New Speed: %.*s", event->data_len, event->data);
-            } else if (strncmp(event->topic, "turretcam/move", event->topic_len < sizeof("turretcam/move") ? event->topic_len : sizeof("turretcam/move"))) {
+            if (strncmp(event->topic, "turretcam/speed", event->topic_len < sizeof("turretcam/speed") ? event->topic_len : sizeof("turretcam/speed")) == 0) {
+                ESP_LOGI(TAG, "Got speed event data: %.*s", event->data_len, event->data);
+                int speed = atoi(event->data);
+                if (speed == 0) {
+                    ESP_LOGW(TAG, "Could not convert '%.*s' to number.", event->data_len, event->data);
+                    break;
+                }
+                ESP_LOGI(TAG, "Got Speed: %i", speed);
+            } else if (strncmp(event->topic, "turretcam/move", event->topic_len < sizeof("turretcam/move") ? event->topic_len : sizeof("turretcam/move")) == 0) {
+                ESP_LOGI(TAG, "Got move event data: %.*s", event->data_len, event->data);
                 /*
                     Rotation is absolute, ranging from 0 to 100 degrees
                     Height is absolute, ranging from 0 to 100 degrees
@@ -83,12 +90,40 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                         "height": int
                     }
                 */
-                printf("Move event: %.*s", event->data_len, event->data);
+
+                // Parse incoming JSON
                 cJSON* json = cJSON_Parse(event->data);
-                int rotation = cJSON_GetObjectItem(json, "rotation")->valueint;
-                int height = cJSON_GetObjectItem(json, "height")->valueint;
+                if (json == NULL) {
+                    const char *error_ptr = cJSON_GetErrorPtr();
+                    if (error_ptr != NULL) {
+                        ESP_LOGW(TAG, "Error before: %s\n", error_ptr);
+                    }
+
+                    ESP_LOGW(TAG, "Error parsing move event JSON");
+                    cJSON_Delete(json);
+                    break;
+                }
+
+                // Pull rotation and height data from the JSON
+                int rotation = -1;
+                int height = -1;
+
+                cJSON* rotation_cj = cJSON_GetObjectItem(json, "rotation");
+                if (cJSON_IsNumber(rotation_cj)) {
+                    rotation = rotation_cj->valueint;
+                }
+                cJSON* height_cj = cJSON_GetObjectItem(json, "height");
+                if (cJSON_IsNumber(height_cj)) {
+                    height = height_cj->valueint;
+                }
+                // Clean up dynamic JSON data :)
+                cJSON_Delete(json);
+                ESP_LOGI(TAG, "Got rotation: %i height: %i", rotation, height);
+
+                // TODO: Do something with `rotation` and `height`
+                // Make sure to check if either are -1
             } else {
-                printf("Unknown topic: %.*s, Data: %.*s", event->topic_len, event->topic, event->data_len, event->data);
+                ESP_LOGW(TAG, "Unknown topic: %.*s, Data: %.*s", event->topic_len, event->topic, event->data_len, event->data);
             }
             break;
         case MQTT_EVENT_ERROR:
