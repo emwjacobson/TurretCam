@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stddef.h>
-#include <math.h>
 #include "sdkconfig.h"
 #include "esp_system.h"
 #include "esp_err.h"
@@ -9,6 +8,7 @@
 #include "esp_event.h"
 #include "nvs_flash.h"
 #include "esp_netif.h"
+#include "cJSON.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "mqtt_client.h"
@@ -48,8 +48,9 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
             msg_id = esp_mqtt_client_subscribe(client, "turretcam/speed", 2);
             ESP_LOGI(TAG, "Subscribed to turretcam/speed, msg_id=%d", msg_id);
-            msg_id = esp_mqtt_client_subscribe(client, "turretcam/speed", 2);
-            ESP_LOGI(TAG, "Subscribed to turretcam/speed, msg_id=%d", msg_id);
+
+            msg_id = esp_mqtt_client_subscribe(client, "turretcam/move", 2);
+            ESP_LOGI(TAG, "Subscribed to turretcam/move, msg_id=%d", msg_id);
 
             // msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
             // ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
@@ -70,8 +71,22 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            if (strncmp(event->topic, "turretcam/speed", min(event->topic_len, sizeof("turretcam/speed")))) {
+            if (strncmp(event->topic, "turretcam/speed", event->topic_len < sizeof("turretcam/speed") ? event->topic_len : sizeof("turretcam/speed"))) {
                 printf("New Speed: %.*s", event->data_len, event->data);
+            } else if (strncmp(event->topic, "turretcam/move", event->topic_len < sizeof("turretcam/move") ? event->topic_len : sizeof("turretcam/move"))) {
+                /*
+                    Rotation is absolute, ranging from 0 to 100 degrees
+                    Height is absolute, ranging from 0 to 100 degrees
+
+                    {
+                        "rotation": int,
+                        "height": int
+                    }
+                */
+                printf("Move event: %.*s", event->data_len, event->data);
+                cJSON* json = cJSON_Parse(event->data);
+                int rotation = cJSON_GetObjectItem(json, "rotation")->valueint;
+                int height = cJSON_GetObjectItem(json, "height")->valueint;
             } else {
                 printf("Unknown topic: %.*s, Data: %.*s", event->topic_len, event->topic, event->data_len, event->data);
             }

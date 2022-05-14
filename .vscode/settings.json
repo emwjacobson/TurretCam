@@ -7,6 +7,14 @@
         "sdkconfig.h": "c",
         "stddef.h": "c",
         "esp_err.h": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "cjson.h": "c",
+        "*.tcc": "c",
+        "chrono": "c",
+        "string_view": "c",
+        "algorithm": "c",
+        "random": "c",
+        "istream": "c",
+        "limits": "c"
     }
 }
