@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stddef.h>
+#include <math.h>
 #include "sdkconfig.h"
 #include "esp_system.h"
 #include "esp_err.h"
@@ -10,7 +11,6 @@
 #include "esp_netif.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
 #include "mqtt_client.h"
 
 // Setup configs
@@ -36,20 +36,84 @@
 #endif
 
 static const char* TAG = "Main";
+static bool wifi_connected = false;
 
-esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
-    return ESP_OK;
+void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+    esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
+    esp_mqtt_client_handle_t client = event->client;
+    int msg_id;
+    // your_context_t *context = event->context;
+    switch (event->event_id) {
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+            msg_id = esp_mqtt_client_subscribe(client, "turretcam/speed", 2);
+            ESP_LOGI(TAG, "Subscribed to turretcam/speed, msg_id=%d", msg_id);
+            msg_id = esp_mqtt_client_subscribe(client, "turretcam/speed", 2);
+            ESP_LOGI(TAG, "Subscribed to turretcam/speed, msg_id=%d", msg_id);
+
+            // msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
+            // ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
+            break;
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+            break;
+        case MQTT_EVENT_SUBSCRIBED:
+            ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+            // msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
+            // ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+            break;
+        case MQTT_EVENT_UNSUBSCRIBED:
+            ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+            break;
+        case MQTT_EVENT_PUBLISHED:
+            ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+            break;
+        case MQTT_EVENT_DATA:
+            ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+            if (strncmp(event->topic, "turretcam/speed", min(event->topic_len, sizeof("turretcam/speed")))) {
+                printf("New Speed: %.*s", event->data_len, event->data);
+            } else {
+                printf("Unknown topic: %.*s, Data: %.*s", event->topic_len, event->topic, event->data_len, event->data);
+            }
+            break;
+        case MQTT_EVENT_ERROR:
+            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+            break;
+        default:
+            ESP_LOGI(TAG, "Other event id:%d", event->event_id);
+            break;
+    }
+}
+
+void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*)event_data;
+        ESP_LOGI(TAG, "WiFi got IP: %s", ip4addr_ntoa(&event->ip_info.ip));
+        wifi_connected = true;
+    }
 }
 
 esp_err_t init_mqtt() {
+    esp_err_t err;
+
     esp_mqtt_client_config_t mqtt_cfg = {
         .uri = CONFIG_BROKER_URL,
         .username = CONFIG_BROKER_USER,
-        .password = CONFIG_BROKER_PASSWORD,
-        .event_handle = mqtt_event_handler
+        .password = CONFIG_BROKER_PASSWORD
     };
 
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    if (client == NULL) {
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "MQTT Client Initialized");
+
+    err = esp_mqtt_client_register_event(client, MQTT_EVENT_ANY, &mqtt_event_handler, NULL);
+    if (err != ESP_OK) {
+        return err;
+    }
+    ESP_LOGI(TAG, "MQTT Events Registered");
+
     return esp_mqtt_client_start(client);
 }
 
@@ -63,6 +127,7 @@ esp_err_t init_wifi() {
     }
 
     wifi_init_config_t init_cfg = WIFI_INIT_CONFIG_DEFAULT();
+    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL);
 
     err = esp_wifi_init(&init_cfg);
     if (err != ESP_OK) {
@@ -98,6 +163,11 @@ esp_err_t init_wifi() {
     }
     ESP_LOGI(TAG, "WiFi started, connecting to " CONFIG_WIFI_SSID);
 
+    err = esp_wifi_connect();
+    if (err != ESP_OK) {
+        return err;
+    }
+
     return ESP_OK;
 }
 
@@ -114,12 +184,18 @@ void init() {
         ESP_LOGE(TAG, "Failed to initialize wifi. Error: %s", esp_err_to_name(err));
     }
 
-    // // Initialize MQTT
-    // err = init_mqtt();
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(TAG, "Failed to initialize MQTT client. Error: %s", esp_err_to_name(err));
-    //     exit(1);
-    // }
+    // Wait until WiFi is connected before trying to connect to mqtt broker
+    while (!wifi_connected) {
+        ESP_LOGI(TAG, "Waiting for WiFi to connect...");
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+
+    // Initialize MQTT
+    err = init_mqtt();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize MQTT client. Error: %s", esp_err_to_name(err));
+        exit(1);
+    }
 }
 
 void app_main() {
