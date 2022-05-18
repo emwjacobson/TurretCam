@@ -46,9 +46,7 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            msg_id = esp_mqtt_client_subscribe(client, "turretcam/speed", 2);
-            ESP_LOGI(TAG, "Subscribed to turretcam/speed, msg_id=%d", msg_id);
-
+            
             msg_id = esp_mqtt_client_subscribe(client, "turretcam/move", 2);
             ESP_LOGI(TAG, "Subscribed to turretcam/move, msg_id=%d", msg_id);
 
@@ -71,18 +69,11 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            if (strncmp(event->topic, "turretcam/speed", event->topic_len < sizeof("turretcam/speed") ? event->topic_len : sizeof("turretcam/speed")) == 0) {
-                ESP_LOGI(TAG, "Got speed event data: %.*s", event->data_len, event->data);
-                int speed = atoi(event->data);
-                if (speed == 0) {
-                    ESP_LOGW(TAG, "Could not convert '%.*s' to number.", event->data_len, event->data);
-                    break;
-                }
-                ESP_LOGI(TAG, "Got Speed: %i", speed);
-
-                // TODO: Do something with the speed
-            } else if (strncmp(event->topic, "turretcam/move", event->topic_len < sizeof("turretcam/move") ? event->topic_len : sizeof("turretcam/move")) == 0) {
-                ESP_LOGI(TAG, "Got move event data: %.*s", event->data_len, event->data);
+            if (strncmp(event->topic, 
+                        "turretcam/move",
+                        event->topic_len < sizeof("turretcam/move") ? event->topic_len : sizeof("turretcam/move")
+                        ) == 0) {
+                ESP_LOGI(TAG, "Got move event: %.*s", event->data_len, event->data);
                 /*
                     Rotation is absolute, ranging from 0 to 100 degrees
                     Height is absolute, ranging from 0 to 100 degrees
@@ -93,39 +84,38 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                     }
                 */
 
-                // Parse incoming JSON
                 cJSON* json = cJSON_Parse(event->data);
                 if (json == NULL) {
-                    const char *error_ptr = cJSON_GetErrorPtr();
+                    const char* error_ptr = cJSON_GetErrorPtr();
                     if (error_ptr != NULL) {
-                        ESP_LOGW(TAG, "Error before: %s\n", error_ptr);
+                        ESP_LOGW(TAG, "Error before: %.*s", 10, error_ptr);
                     }
-
                     ESP_LOGW(TAG, "Error parsing move event JSON");
                     cJSON_Delete(json);
                     break;
                 }
 
-                // Pull rotation and height data from the JSON
                 int rotation = -1;
                 int height = -1;
+                int speed = -1;
 
                 cJSON* rotation_cj = cJSON_GetObjectItem(json, "rotation");
                 if (cJSON_IsNumber(rotation_cj)) {
                     rotation = rotation_cj->valueint;
                 }
+
                 cJSON* height_cj = cJSON_GetObjectItem(json, "height");
                 if (cJSON_IsNumber(height_cj)) {
                     height = height_cj->valueint;
                 }
-                // Clean up dynamic JSON data :)
-                cJSON_Delete(json);
-                ESP_LOGI(TAG, "Got rotation: %i height: %i", rotation, height);
 
-                // TODO: Do something with `rotation` and `height`
-                // Make sure to check if either are -1
-            } else {
-                ESP_LOGW(TAG, "Unknown topic: %.*s, Data: %.*s", event->topic_len, event->topic, event->data_len, event->data);
+                cJSON* speed_cj = cJSON_GetObjectItem(json, "speed");
+                if (cJSON_IsNumber(speed_cj)) {
+                    speed = speed_cj->valueint;
+                }
+
+                cJSON_Delete(json);
+                ESP_LOGI(TAG, "Got rotation: %i height: %i speed: %i", rotation, height, speed);
             }
             break;
         case MQTT_EVENT_ERROR:
