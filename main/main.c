@@ -79,6 +79,8 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                     break;
                 }
                 ESP_LOGI(TAG, "Got Speed: %i", speed);
+
+                // TODO: Do something with the speed
             } else if (strncmp(event->topic, "turretcam/move", event->topic_len < sizeof("turretcam/move") ? event->topic_len : sizeof("turretcam/move")) == 0) {
                 ESP_LOGI(TAG, "Got move event data: %.*s", event->data_len, event->data);
                 /*
