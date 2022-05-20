@@ -15,6 +15,7 @@
         "algorithm": "c",
         "random": "c",
         "istream": "c",
-        "limits": "c"
+        "limits": "c",
+        "util.h": "c"
     }
 }

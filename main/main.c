@@ -222,17 +222,25 @@ void init() {
     err = nvs_flash_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize NVS. Error: %s", esp_err_to_name(err));
+        exit(1);
     }
 
     err = init_wifi();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize wifi. Error: %s", esp_err_to_name(err));
+        exit(1);
     }
+
+    // TODO: Initialize Servo
+
+    // TODO: Initialize Stepper
 
     // Wait until WiFi is connected before trying to connect to mqtt broker
     while (!wifi_connected) {
         ESP_LOGI(TAG, "Waiting for WiFi to connect...");
         vTaskDelay(500 / portTICK_PERIOD_MS);
+
+        // TODO: If not connected for 5+ seconds, restart ESP
     }
 
     // Initialize MQTT
