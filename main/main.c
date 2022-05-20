@@ -95,9 +95,9 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                     break;
                 }
 
-                int rotation = -1;
-                int height = -1;
-                int speed = -1;
+                int rotation = INT_MAX;
+                int height = INT_MAX;
+                int speed = INT_MAX;
 
                 cJSON* rotation_cj = cJSON_GetObjectItem(json, "rotation");
                 if (cJSON_IsNumber(rotation_cj)) {
@@ -116,6 +116,9 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
 
                 cJSON_Delete(json);
                 ESP_LOGI(TAG, "Got rotation: %i height: %i speed: %i", rotation, height, speed);
+
+                // TODO: Do something with rotation, height, speed
+                // Make sure to ignore when values == INT_MAX
             }
             break;
         case MQTT_EVENT_ERROR:
