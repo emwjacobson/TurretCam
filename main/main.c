@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "mqtt_client.h"
+#include "servo.h"
 
 // Setup configs
 // These should /technically/ be set using `make menuconfig`
@@ -117,8 +118,18 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                 cJSON_Delete(json);
                 ESP_LOGI(TAG, "Got rotation: %i height: %i speed: %i", rotation, height, speed);
 
-                // TODO: Do something with rotation, height, speed
-                // Make sure to ignore when values == INT_MAX
+                if (speed != INT_MAX) {
+                    // TODO: Set speed
+                }
+
+                if (rotation != INT_MAX) {
+                    // TODO: Set stepper rotation
+                }
+
+                // If height != INT_MAX, then we should set the height
+                if (height != INT_MAX) {
+                    servo_set_rotation(height);
+                }
             }
             break;
         case MQTT_EVENT_ERROR:
@@ -231,7 +242,11 @@ void init() {
         exit(1);
     }
 
-    // TODO: Initialize Servo
+    err = init_servo();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize servo. Error: %s", esp_err_to_name(err));
+        exit(1);
+    }
 
     // TODO: Initialize Stepper
 

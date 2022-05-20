@@ -16,6 +16,8 @@ esp_err_t init_servo() {
         ESP_LOGE(TAG, "Error starting PWM.");
         return err;
     }
+
+    return ESP_OK;
 }
 
 /**
@@ -24,7 +26,7 @@ esp_err_t init_servo() {
  * @param percent Range from 0 to 100. 0 being full down, 100 being full up
  * @return esp_err_t 
  */
-esp_err_t set_servo_rotation(uint8_t percent) {
+esp_err_t servo_set_rotation(uint8_t percent) {
     if (percent > 100) percent = 100;
 
     // Convert percent (0 to 100) to PWM range (1000 to 2000)
@@ -47,5 +49,11 @@ esp_err_t set_servo_rotation(uint8_t percent) {
         return err;
     }
 
-    return pwm_start();
+    err = pwm_start();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error starting PWM.");
+        return err;
+    }
+
+    return ESP_OK;
 }

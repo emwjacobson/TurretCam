@@ -17,10 +17,10 @@
 static const char* TAG = "Main";
 
 static const uint32_t duties = {
-    PWM_CENTER / 2
+    PWM_CENTER
 };
 
 esp_err_t init_servo();
-esp_err_t set_duty(uint32_t duty);
+esp_err_t servo_set_rotation(uint32_t percent);
 
 #endif
