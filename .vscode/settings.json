@@ -16,6 +16,8 @@
         "random": "c",
         "istream": "c",
         "limits": "c",
-        "util.h": "c"
+        "util.h": "c",
+        "servo.h": "c",
+        "stdio.h": "c"
     }
 }
