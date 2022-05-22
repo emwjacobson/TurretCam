@@ -39,6 +39,14 @@
 static const char* TAG = "Main";
 static bool wifi_connected = false;
 
+/**
+ * @brief Handler for MQTT events
+ * 
+ * @param event_handler_arg Arbiturary data argument. Is set to NULL in my implementation.
+ * @param event_base Unused
+ * @param event_id Unused
+ * @param event_data The data of the event
+ */
 void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
     esp_mqtt_client_handle_t client = event->client;
@@ -98,6 +106,7 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
 
                 int rotation = INT_MAX;
                 int height = INT_MAX;
+                int height_mode = INT_MAX;
                 int speed = INT_MAX;
 
                 cJSON* rotation_cj = cJSON_GetObjectItem(json, "rotation");
@@ -108,6 +117,11 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                 cJSON* height_cj = cJSON_GetObjectItem(json, "height");
                 if (cJSON_IsNumber(height_cj)) {
                     height = height_cj->valueint;
+                }
+
+                cJSON* height_mode_cj = cJSON_GetObjectItem(json, "height_mode");
+                if (cJSON_IsNumber(height_mode_cj)) {
+                    height_mode = height_mode_cj->valueint;
                 }
 
                 cJSON* speed_cj = cJSON_GetObjectItem(json, "speed");
@@ -128,7 +142,10 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
 
                 // If height != INT_MAX, then we should set the height
                 if (height != INT_MAX) {
-                    servo_set_rotation(height);
+                    if (height_mode == 1 || height_mode == INT_MAX)
+                        servo_set_rotation_absolute(height);
+                    else if (height_mode == 2)
+                        servo_set_rotation_relative(height);
                 }
             }
             break;
@@ -141,6 +158,15 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
     }
 }
 
+
+/**
+ * @brief Handler for wifi events. Used to toggle the wifi_connected flag to true
+ * 
+ * @param arg 
+ * @param event_base 
+ * @param event_id 
+ * @param event_data 
+ */
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*)event_data;
@@ -149,6 +175,11 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
     }
 }
 
+/**
+ * @brief Initialize MQTT and connect to broker
+ * 
+ * @return esp_err_t 
+ */
 esp_err_t init_mqtt() {
     esp_err_t err;
 
@@ -173,6 +204,11 @@ esp_err_t init_mqtt() {
     return esp_mqtt_client_start(client);
 }
 
+/**
+ * @brief Initialize wifi and connect to access point
+ * 
+ * @return esp_err_t 
+ */
 esp_err_t init_wifi() {
     esp_err_t err;
 
@@ -227,6 +263,10 @@ esp_err_t init_wifi() {
     return ESP_OK;
 }
 
+/**
+ * @brief Main initializer function. Called the sub-init functions
+ * 
+ */
 void init() {
     esp_err_t err;
 
@@ -251,11 +291,14 @@ void init() {
     // TODO: Initialize Stepper
 
     // Wait until WiFi is connected before trying to connect to mqtt broker
+    uint8_t counter = 0;
     while (!wifi_connected) {
+        if (counter >= 10) {
+            esp_restart();
+        }
         ESP_LOGI(TAG, "Waiting for WiFi to connect...");
         vTaskDelay(500 / portTICK_PERIOD_MS);
-
-        // TODO: If not connected for 5+ seconds, restart ESP
+        counter++;
     }
 
     // Initialize MQTT
@@ -269,5 +312,9 @@ void init() {
 void app_main() {
     
     init();
+
+    while (true) {
+        // TODO: Setup state machines!
+    }
 
 }

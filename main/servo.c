@@ -13,6 +13,11 @@ uint32_t pwm_pins = {
     5
 };
 
+/**
+ * @brief Initializes the servo, sets to center position.
+ * 
+ * @return esp_err_t 
+ */
 esp_err_t init_servo() {
     ESP_LOGI(TAG_SERVO, "Initializing Servo");
     esp_err_t err;
@@ -43,7 +48,7 @@ esp_err_t init_servo() {
  * @param percent Range from 0 to 100. 0 being full down, 100 being full up
  * @return esp_err_t 
  */
-esp_err_t servo_set_rotation(uint8_t percent) {
+esp_err_t servo_set_rotation_absolute(uint8_t percent) {
     if (percent > 100) percent = 100;
 
     // Convert percent (0 to 100) to PWM range (1000 to 2000)
@@ -51,7 +56,6 @@ esp_err_t servo_set_rotation(uint8_t percent) {
 
     ESP_LOGI(TAG_SERVO, "Setting servo. Percent %i = %i duty", percent, duty);
 
-    // TODO: This check is probably redundent
     if (duty > PWM_PERIOD) {
         duty = PWM_MAX;
     } else if (duty < PWM_MIN) {
@@ -59,15 +63,53 @@ esp_err_t servo_set_rotation(uint8_t percent) {
     }
     
     esp_err_t err;
-
-    // TODO: Test if channel_num is PWM_PIN, or if it is a (1 or 0)
-    //       indexed of number of channel from pwm_init
     err = pwm_set_duty(0, duty);
     if (err != ESP_OK) {
         ESP_LOGW(TAG_SERVO, "Error setting PWM duty.");
         return err;
     }
 
+    err = pwm_start();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG_SERVO, "Error starting PWM.");
+        return err;
+    }
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Rotates the servo by a set amount, in percentage.
+ * 
+ * @param amount Percent to be rotated
+ * @return esp_err_t 
+ */
+esp_err_t servo_set_rotation_relative(int8_t amount) {
+    uint32_t duty;
+    esp_err_t err;
+
+    err = pwm_get_duty(0, &duty);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG_SERVO, "Error getting current PWM duty.");
+        return err;
+    }
+
+    // At this point duty is the PWM duty, needs to be converted from 0 to 100
+    uint8_t percent = map(duty, PWM_MIN, PWM_MAX, 100, 0);
+    percent += amount;
+    duty = map(percent, 100, 0, PWM_MIN, PWM_MAX);
+
+    if (duty > PWM_MAX)
+        duty = PWM_MAX;
+    else if (duty < PWM_MIN)
+        duty = PWM_MIN;
+
+    err = pwm_set_duty(0, duty);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG_SERVO, "Error setting relative PWM duty.");
+        return err;
+    }
+    
     err = pwm_start();
     if (err != ESP_OK) {
         ESP_LOGW(TAG_SERVO, "Error starting PWM.");
