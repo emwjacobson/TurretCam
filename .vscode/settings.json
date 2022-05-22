@@ -18,6 +18,7 @@
         "limits": "c",
         "util.h": "c",
         "servo.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "gpio.h": "c"
     }
 }

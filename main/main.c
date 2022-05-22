@@ -13,6 +13,7 @@
 #include "freertos/task.h"
 #include "mqtt_client.h"
 #include "servo.h"
+#include "stepper.h"
 
 // Setup configs
 // These should /technically/ be set using `make menuconfig`
@@ -288,7 +289,11 @@ void init() {
         exit(1);
     }
 
-    // TODO: Initialize Stepper
+    err = init_stepper();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize stepper. Error: %s", esp_err_to_name(err));
+        exit(1);
+    }
 
     // Wait until WiFi is connected before trying to connect to mqtt broker
     uint8_t counter = 0;
