@@ -1,10 +1,21 @@
 #include "stepper.h"
 
 #include <stdint.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "esp_system.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 
 static const char* TAG_STEPPER = "Servo";
+
+void stepper_task(void * pvParameters) {
+    while(1) {
+        // TODO: Check for item in queue
+        //       If item in queue, process that # of steps
+    }
+}
 
 esp_err_t init_stepper() {
     gpio_config_t io_conf = {
@@ -22,6 +33,17 @@ esp_err_t init_stepper() {
         ESP_LOGW(TAG_STEPPER, "Error setting gpio config.");
         return err;
     }
+
+    err = gpio_set_level(STEPPER_PIN_STEP, 0);
+    err = gpio_set_level(STEPPER_PIN_DIR, STEPPER_DIR_CW);
+    err = gpio_set_level(STEPPER_PIN_ENABLE, 0); // 0 enables stepper
+
+    BaseType_t ret = xTaskCreate(stepper_task, "Stepper Task", 1024, NULL, tskIDLE_PRIORITY, NULL);
+    if (ret != pdPASS) {
+        ESP_LOGW(TAG_STEPPER, "Error starting stepper task");
+    }
+
+    // TODO: Create queue
 
     return ESP_OK;
 }
@@ -54,7 +76,7 @@ esp_err_t stepper_set_enabled(uint8_t enable) {
     esp_err_t err;
 
     // Because stepper driver is ~ENABLE, need to invert
-    err = gpio_set_level(STEPPER_PIN_ENABLE, (~enable & 0x01));
+    err = gpio_set_level(STEPPER_PIN_ENABLE, ~(enable & 0x01));
     if (err != ESP_OK) {
         ESP_LOGW(TAG_STEPPER, "Error setting stepper enable/disable");
         return err;
@@ -63,6 +85,12 @@ esp_err_t stepper_set_enabled(uint8_t enable) {
     return ESP_OK;
 }
 
+/**
+ * @brief Steps the stepper 1 step.
+ * 10ms between steps is fastest speed
+ * 
+ * @return esp_err_t 
+ */
 esp_err_t stepper_step() {
     esp_err_t err;
 
@@ -78,4 +106,8 @@ esp_err_t stepper_step() {
     }
 
     return ESP_OK;
+}
+
+esp_err_t stepper_make_move(int8_t amount) {
+    // TODO: Add item to queue
 }

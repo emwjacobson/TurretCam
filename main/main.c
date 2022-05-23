@@ -318,8 +318,4 @@ void app_main() {
     
     init();
 
-    while (true) {
-        // TODO: Setup state machines!
-    }
-
 }
