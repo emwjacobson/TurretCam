@@ -7,6 +7,7 @@
 #include "esp_system.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "util.h"
 
 static const char* TAG_STEPPER = "Servo";
 
@@ -14,6 +15,8 @@ typedef struct {
     int8_t amount
 } movement_event_t;
 QueueHandle_t movement_queue;
+
+static uint8_t _delay;
 
 void stepper_task(void * pvParameters) {
     movement_event_t event;
@@ -23,6 +26,20 @@ void stepper_task(void * pvParameters) {
         
         // TODO: Do something with event.amount
         ESP_LOGI(TAG_STEPPER, "Movement processing %i", event.amount);
+
+        // The sign of `event.amount` tells the direction, the magnitude is the number of steps
+        if (event.amount < 0) {
+            stepper_set_direction(STEPPER_DIR_CCW);
+            event.amount *= -1;
+        } else if (event.amount > 0) {
+            stepper_set_direction(STEPPER_DIR_CW);
+        }
+
+        for(int i=0; i<event.amount; i++) {
+            // TODO: Need to do checks to make sure we do not go too far left or right
+            stepper_step();
+            vTaskDelay(_delay / portTICK_PERIOD_MS);
+        }
     }
 }
 
@@ -122,4 +139,20 @@ esp_err_t stepper_make_move(int8_t amount) {
         .amount = amount
     };
     xQueueSend(movement_queue, &event, 0);
+}
+
+/**
+ * @brief Sets the speed that the stepper should run at.
+ * 
+ * @param speed Valid values are from 20-100
+ * @return esp_err_t 
+ */
+esp_err_t stepper_set_speed(int8_t speed) {
+    if (speed < 20) speed = 20;
+    if (speed > 100) speed = 100;
+
+    // Maps from range 20-100 (speed values) to 100-10(delay values)
+    _delay = map(speed, 20, 100, STEPPER_DELAY_MAX, STEPPER_DELAY_MIN);
+
+    return ESP_OK;
 }
