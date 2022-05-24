@@ -10,10 +10,19 @@
 
 static const char* TAG_STEPPER = "Servo";
 
+typedef struct {
+    int8_t amount
+} movement_event_t;
+QueueHandle_t movement_queue;
+
 void stepper_task(void * pvParameters) {
+    movement_event_t event;
     while(1) {
-        // TODO: Check for item in queue
-        //       If item in queue, process that # of steps
+        // This will block until an item is in the queue
+        xQueueReceive(&movement_queue, &event, portMAX_DELAY);
+        
+        // TODO: Do something with event.amount
+        ESP_LOGI(TAG_STEPPER, "Movement processing %i", event.amount);
     }
 }
 
@@ -43,7 +52,7 @@ esp_err_t init_stepper() {
         ESP_LOGW(TAG_STEPPER, "Error starting stepper task");
     }
 
-    // TODO: Create queue
+    movement_queue = xQueueCreate(10, sizeof(movement_queue));
 
     return ESP_OK;
 }
@@ -109,5 +118,8 @@ esp_err_t stepper_step() {
 }
 
 esp_err_t stepper_make_move(int8_t amount) {
-    // TODO: Add item to queue
+    movement_event_t event = {
+        .amount = amount
+    };
+    xQueueSend(movement_queue, &event, 0);
 }
