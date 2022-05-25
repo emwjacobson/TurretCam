@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include "freertos/FreeRTOS.h"
+#include "FreeRTOSConfig.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_system.h"
@@ -11,9 +12,12 @@
 
 static const char* TAG_STEPPER = "Servo";
 
+esp_err_t stepper_step();
+
 typedef struct {
-    int8_t amount
+    int8_t amount;
 } movement_event_t;
+
 QueueHandle_t movement_queue;
 
 static uint8_t _delay;
@@ -22,10 +26,11 @@ void stepper_task(void * pvParameters) {
     movement_event_t event;
     while(1) {
         // This will block until an item is in the queue
-        xQueueReceive(&movement_queue, &event, portMAX_DELAY);
+        xQueueReceive(movement_queue, &event, portMAX_DELAY);
         
         // TODO: Do something with event.amount
         ESP_LOGI(TAG_STEPPER, "Movement processing %i", event.amount);
+        // stepper_set_enabled(1);
 
         // The sign of `event.amount` tells the direction, the magnitude is the number of steps
         if (event.amount < 0) {
@@ -36,10 +41,11 @@ void stepper_task(void * pvParameters) {
         }
 
         for(int i=0; i<event.amount; i++) {
-            // TODO: Need to do checks to make sure we do not go too far left or right
             stepper_step();
             vTaskDelay(_delay / portTICK_PERIOD_MS);
         }
+
+        // stepper_set_enabled(0);
     }
 }
 
@@ -64,12 +70,14 @@ esp_err_t init_stepper() {
     err = gpio_set_level(STEPPER_PIN_DIR, STEPPER_DIR_CW);
     err = gpio_set_level(STEPPER_PIN_ENABLE, 0); // 0 enables stepper
 
-    BaseType_t ret = xTaskCreate(stepper_task, "Stepper Task", 1024, NULL, tskIDLE_PRIORITY, NULL);
+    movement_queue = xQueueCreate(10, sizeof(movement_event_t));
+
+    BaseType_t ret = xTaskCreate(stepper_task, "Stepper Task", 2048, NULL, tskIDLE_PRIORITY, NULL);
     if (ret != pdPASS) {
         ESP_LOGW(TAG_STEPPER, "Error starting stepper task");
     }
 
-    movement_queue = xQueueCreate(10, sizeof(movement_queue));
+    // stepper_set_enabled(0);
 
     return ESP_OK;
 }
@@ -100,9 +108,9 @@ esp_err_t stepper_set_direction(uint8_t dir) {
  */
 esp_err_t stepper_set_enabled(uint8_t enable) {
     esp_err_t err;
-
+    
     // Because stepper driver is ~ENABLE, need to invert
-    err = gpio_set_level(STEPPER_PIN_ENABLE, ~(enable & 0x01));
+    err = gpio_set_level(STEPPER_PIN_ENABLE, ~enable);
     if (err != ESP_OK) {
         ESP_LOGW(TAG_STEPPER, "Error setting stepper enable/disable");
         return err;
@@ -135,10 +143,13 @@ esp_err_t stepper_step() {
 }
 
 esp_err_t stepper_make_move(int8_t amount) {
+    ESP_LOGI(TAG_STEPPER, "Adding movement to queue %i", amount);
     movement_event_t event = {
         .amount = amount
     };
     xQueueSend(movement_queue, &event, 0);
+
+    return ESP_OK;
 }
 
 /**
@@ -150,9 +161,15 @@ esp_err_t stepper_make_move(int8_t amount) {
 esp_err_t stepper_set_speed(int8_t speed) {
     if (speed < 20) speed = 20;
     if (speed > 100) speed = 100;
+    ESP_LOGI(TAG_STEPPER, "Setting stepper speed to %i", speed);
 
     // Maps from range 20-100 (speed values) to 100-10(delay values)
     _delay = map(speed, 20, 100, STEPPER_DELAY_MAX, STEPPER_DELAY_MIN);
+    ESP_LOGI(TAG_STEPPER, "Speed mapped to delay %i", _delay);
 
+    return ESP_OK;
+}
+
+esp_err_t stepper_set_center() {
     return ESP_OK;
 }

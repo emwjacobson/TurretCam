@@ -134,11 +134,11 @@ void mqtt_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                 ESP_LOGI(TAG, "Got rotation: %i height: %i speed: %i", rotation, height, speed);
 
                 if (speed != INT_MAX) {
-                    // TODO: Set speed
+                    stepper_set_speed(speed);
                 }
 
                 if (rotation != INT_MAX) {
-                    // TODO: Set stepper rotation
+                    stepper_make_move(rotation);
                 }
 
                 // If height != INT_MAX, then we should set the height
