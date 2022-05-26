@@ -27,10 +27,11 @@ void stepper_task(void * pvParameters) {
     while(1) {
         // This will block until an item is in the queue
         xQueueReceive(movement_queue, &event, portMAX_DELAY);
+
+        stepper_set_enabled(1); // Enable stepper
         
         // TODO: Do something with event.amount
         ESP_LOGI(TAG_STEPPER, "Movement processing %i", event.amount);
-        // stepper_set_enabled(1);
 
         // The sign of `event.amount` tells the direction, the magnitude is the number of steps
         if (event.amount < 0) {
@@ -45,7 +46,7 @@ void stepper_task(void * pvParameters) {
             vTaskDelay(_delay / portTICK_PERIOD_MS);
         }
 
-        // stepper_set_enabled(0);
+        stepper_set_enabled(0); // Disable stepper at end
     }
 }
 
@@ -68,7 +69,8 @@ esp_err_t init_stepper() {
 
     err = gpio_set_level(STEPPER_PIN_STEP, 0);
     err = gpio_set_level(STEPPER_PIN_DIR, STEPPER_DIR_CW);
-    err = gpio_set_level(STEPPER_PIN_ENABLE, 0); // 0 enables stepper
+    // err = gpio_set_level(STEPPER_PIN_ENABLE, 0); // Disables stepper
+    stepper_set_enabled(0); // Disable stepper
 
     movement_queue = xQueueCreate(10, sizeof(movement_event_t));
 
@@ -76,8 +78,6 @@ esp_err_t init_stepper() {
     if (ret != pdPASS) {
         ESP_LOGW(TAG_STEPPER, "Error starting stepper task");
     }
-
-    // stepper_set_enabled(0);
 
     return ESP_OK;
 }
@@ -109,8 +109,8 @@ esp_err_t stepper_set_direction(uint8_t dir) {
 esp_err_t stepper_set_enabled(uint8_t enable) {
     esp_err_t err;
     
-    // Because stepper driver is ~ENABLE, need to invert
-    err = gpio_set_level(STEPPER_PIN_ENABLE, ~enable);
+    // Because ENABLE is active low, need to invert
+    err = gpio_set_level(STEPPER_PIN_ENABLE, (~enable & 0x01));
     if (err != ESP_OK) {
         ESP_LOGW(TAG_STEPPER, "Error setting stepper enable/disable");
         return err;
